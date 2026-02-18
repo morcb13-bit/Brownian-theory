@@ -10,6 +10,10 @@ published: true
 ## Brownian Motion Recreated with Addition Alone
 
 ---
+# No sin, No cos, No Differential Equations
+## Brownian Motion Recreated with Addition Alone
+
+---
 
 :::message
 This simulation contains no trigonometric functions, no differential equations, and no probability density functions.
@@ -119,6 +123,12 @@ Instead of `∇²ρ = D・∂ρ/∂t` (diffusion equation), diffusion is express
 
 ### Step 3: Direction Shift (Wave-Number Component Generation)
 
+:::message alert
+**Note:** The basic version uses `np.arctan2` for direction determination, which contradicts the claim "no trigonometric functions." For a more rigorous implementation, **`brownian_integer_only.py`** determines direction using pure integer arithmetic without `arctan2`.
+:::
+
+**Basic version (using arctan2):**
+
 ```python
 # Discretize current velocity into 24 directions
 angle_index = int((np.arctan2(current_vy, current_vx) * 24 / (2 * np.pi)) % 24)
@@ -130,6 +140,40 @@ dir_dx, dir_dy = DIRS_24[pisano_shift]
 # New velocity (addition + friction)
 new_vx[y, x] = (current_vx * 6 + avg_vx * 3 + dir_dx / 10) / 9
 ```
+
+**Pure integer arithmetic version (no arctan2):**
+
+```python
+def get_direction_index_integer_only(vx, vy):
+    """Determine 24 directions using integer arithmetic only"""
+    # Determine quadrant by sign
+    sign_x = 1 if vx >= 0 else -1
+    sign_y = 1 if vy >= 0 else -1
+    
+    # Calculate ratio as integer (tan(θ) ≈ vy/vx)
+    abs_vx, abs_vy = abs(vx), abs(vy)
+    if abs_vx > 0.1:
+        ratio = int((abs_vy * 100) / abs_vx)  # Scale by 100 and convert to integer
+    else:
+        ratio = 1000  # Nearly vertical
+    
+    # Determine one of 24 directions by ratio range (addition/comparison only)
+    if sign_x > 0 and sign_y >= 0:  # Quadrant 1
+        if ratio < 30:    idx = 0   # tan < 0.3
+        elif ratio < 60:  idx = 1   # tan < 0.6
+        elif ratio < 100: idx = 2   # tan < 1.0
+        # ... continued
+    # ... other quadrants similarly
+    
+    return idx
+```
+
+This method:
+1. Determines quadrant from vx, vy signs (if statements only)
+2. Calculates ratio `vy/vx` as integer (multiplication/division)
+3. Determines 24 directions by ratio range (comparison only)
+
+**No sin, cos, arctan2, or π - absolutely no trigonometric functions.**
 
 The direction index shifts by `self.step` at each step. This causes random fluctuations to "align" in specific directions, naturally generating local order such as vortices.
 
