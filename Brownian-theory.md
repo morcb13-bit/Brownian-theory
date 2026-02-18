@@ -111,6 +111,12 @@ for dy_offset in [-1, 0, 1]:
 
 ### ステップ3：離散周期方向シフト（波数成分の発生）
 
+:::message alert
+**注：** 基本版では方向判定に `np.arctan2` を使用していますが、これは「三角関数を使わない」という主張と矛盾します。より厳密な実装として **`brownian_integer_only.py`** では、`arctan2` も使わず完全整数演算のみで方向を決定しています。
+:::
+
+**基本版（arctan2使用）：**
+
 ```python
 # 現在の速度を24方向に離散化
 angle_index = int((np.arctan2(current_vy, current_vx) * 24 / (2 * np.pi)) % 24)
@@ -122,6 +128,40 @@ dir_dx, dir_dy = PISANO_24_DIRS[pisano_shift]
 # 新しい速度（足し算 + 摩擦）
 new_vx[y, x] = (current_vx * 6 + avg_vx * 3 + dir_dx / 10) / 9
 ```
+
+**完全整数演算版（arctan2不使用）：**
+
+```python
+def get_direction_index_integer_only(vx, vy):
+    """整数演算のみで24方向を決定"""
+    # 符号で4象限を判定
+    sign_x = 1 if vx >= 0 else -1
+    sign_y = 1 if vy >= 0 else -1
+    
+    # 比率を整数で計算（tan(θ) ≈ vy/vx）
+    abs_vx, abs_vy = abs(vx), abs(vy)
+    if abs_vx > 0.1:
+        ratio = int((abs_vy * 100) / abs_vx)  # 100倍して整数化
+    else:
+        ratio = 1000  # ほぼ垂直
+    
+    # 比率の範囲で24方向のどれかを決定（足し算・比較のみ）
+    if sign_x > 0 and sign_y >= 0:  # 第1象限
+        if ratio < 30:    idx = 0   # tan < 0.3
+        elif ratio < 60:  idx = 1   # tan < 0.6
+        elif ratio < 100: idx = 2   # tan < 1.0
+        # ... 以下続く
+    # ... 他の象限も同様
+    
+    return idx
+```
+
+この方法では：
+1. vx, vy の符号から4象限を判定（if文のみ）
+2. 比率 `vy/vx` を整数で計算（掛け算・割り算）
+3. 比率の範囲で24方向を決定（比較演算のみ）
+
+**sin, cos, arctan2, πなど、三角関数は一切使っていません。**
 
 各ステップで方向インデックスが `self.step` だけシフトします。これにより、ランダムな揺らぎが特定の方向へと「整列」され、渦のような局所的な秩序が自然に生まれます。
 
